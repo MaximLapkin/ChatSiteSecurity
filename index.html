@@ -1,249 +1,337 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>P2P Internet Chat</title>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <style>
-        :root {
-            --bg-color: #ffffff;
-            --chat-bg: #f0f2f5;
-            --sidebar-bg: #ffffff;
-            --text-color: #050505;
-            --primary-color: #0084ff;
-            --received-msg-bg: #e4e6eb;
-            --sent-msg-text: #ffffff;
-            --border-color: #ddd;
-        }
-
-        [data-theme="dark"] {
-            --bg-color: #18191a;
-            --chat-bg: #242526;
-            --sidebar-bg: #242526;
-            --text-color: #e4e6eb;
-            --primary-color: #2d88ff;
-            --received-msg-bg: #3a3b3c;
-            --sent-msg-text: #ffffff;
-            --border-color: #3e4042;
-        }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
-        body { background-color: var(--bg-color); color: var(--text-color); height: 100vh; display: flex; overflow: hidden; }
-
-        /* ЭКРАН ВХОДА */
-        #login-screen {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: var(--bg-color); z-index: 100;
-            display: flex; align-items: center; justify-content: center;
-        }
-        .card {
-            background: var(--sidebar-bg); padding: 2rem; border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1); width: 90%; max-width: 400px;
-            text-align: center; border: 1px solid var(--border-color);
-        }
-        input {
-            width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px;
-            border: 1px solid var(--border-color); background: var(--chat-bg);
-            color: var(--text-color); outline: none;
-        }
-        button {
-            width: 100%; padding: 12px; border: none; border-radius: 8px;
-            background: var(--primary-color); color: white; font-weight: bold;
-            cursor: pointer; margin-top: 5px; font-size: 1rem;
-        }
-        button:disabled { background: #ccc; cursor: not-allowed; }
-        .status { margin-top: 10px; font-size: 0.9rem; color: #888; min-height: 20px;}
-
-        /* ЧАТ */
-        #chat-app { display: none; width: 100%; height: 100%; flex-direction: column; }
-        header {
-            padding: 15px; background: var(--sidebar-bg); border-bottom: 1px solid var(--border-color);
-            display: flex; justify-content: space-between; align-items: center;
-        }
-        #messages-area {
-            flex: 1; overflow-y: auto; padding: 20px; background: var(--chat-bg);
-            display: flex; flex-direction: column; gap: 10px;
-        }
-        .message {
-            max-width: 75%; padding: 10px 15px; border-radius: 18px; font-size: 0.95rem;
-            line-height: 1.4; word-wrap: break-word;
-        }
-        .sent { align-self: flex-end; background: var(--primary-color); color: var(--sent-msg-text); border-bottom-right-radius: 2px; }
-        .received { align-self: flex-start; background: var(--received-msg-bg); color: var(--text-color); border-bottom-left-radius: 2px; }
-        
-        footer { padding: 15px; background: var(--sidebar-bg); display: flex; gap: 10px; border-top: 1px solid var(--border-color); }
-        .loader { border: 3px solid #f3f3f3; border-top: 3px solid var(--primary-color); border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 5px; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    </style>
+  <meta charset="utf-8" />
+  <title>Многочаты с локальным хранением</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg: #0e0f14;
+      --card: #14181f;
+      --text: #e6e6e6;
+      --muted: #a6a6a6;
+      --accent: #4e9cff;
+      --shadow: 0 6px 20px rgba(0,0,0,.25);
+      --input: #1e232a;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: Inter, ui-sans-serif, system-ui, -apple-system; }
+    .app { display: grid; grid-template-columns: 320px 1fr; gap: 16px; height: 100%; padding: 16px; }
+    .panel { background: var(--card); border-radius: 12px; padding: 16px; box-shadow: var(--shadow); display: flex; flex-direction: column; }
+    h1 { font-size: 18px; margin: 0 0 8px; }
+    input, textarea, select {
+      width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #2a2f38; background: #0f141b; color: var(--text);
+    }
+    textarea { resize: vertical; min-height: 64px; }
+    .btn { padding: 10px 12px; border-radius: 8px; border: none; background: var(--accent); color: #fff; cursor: pointer; font-weight: 600; }
+    .btn.secondary { background: #2c2f38; color: #e6e6e6; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .list { display: grid; gap: 8px; max-height: 60vh; overflow: auto; padding-right: 6px; }
+    .room-item { padding: 10px; border-radius: 8px; background: #1a2030; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+    .room-item.active { outline: 2px solid var(--accent); }
+    .chat { display: flex; flex-direction: column; height: 100%; }
+    .messages { flex: 1; overflow: auto; padding: 12px; border-radius: 8px; background: #111827; border: 1px solid #232a34; }
+    .message { margin: 6px 0; padding: 8px 10px; border-radius: 8px; max-width: 70%; }
+    .me { background: #4e9cff; color: white; align-self: flex-end; }
+    .them { background: #2a2f38; color: #eaeaea; align-self: flex-start; }
+    .row { display: flex; gap: 8px; align-items: center; }
+    .section { margin-bottom: 12px; }
+    /* Темный режим toggle */
+    .toggle { display: inline-flex; align-items: center; gap: 8px; user-select: none; }
+    .badge { font-size: 12px; padding: 2px 6px; border-radius: 999px; background: #1e2430; color: #cbd5e1; }
+    @media (max-width: 900px) {
+      .app { grid-template-columns: 1fr; height: auto; }
+      .panel { min-height: 240px; }
+    }
+  </style>
 </head>
 <body>
-
-    <div id="login-screen">
-        <div class="card" id="step-1">
-            <h2>Интернет Чат</h2>
-            <p style="opacity: 0.7; font-size: 0.9rem; margin-bottom: 15px;">P2P соединение (работает через интернет)</p>
-            <input type="text" id="my-name" placeholder="Ваше имя" maxlength="15">
-            <button onclick="initPeer()">Получить мой ID</button>
+  <div class="app">
+    <!-- Левая панель: управление комнатами и профилем -->
+    <aside class="panel" id="sidebar">
+      <h1>Многочаты (локально)</h1>
+      <div class="section">
+        <div class="row" style="justify-content: space-between;">
+          <strong>ВашUID</strong>
+          <span class="badge" id="localUserUid">генерируется</span>
         </div>
+      </div>
 
-        <div class="card" id="step-2" style="display: none;">
-            <h3>Ваш ID:</h3>
-            <div style="background: var(--chat-bg); padding: 10px; border-radius: 5px; margin: 10px 0; font-family: monospace; font-weight: bold; border: 1px solid var(--primary-color); color: var(--primary-color); word-break: break-all;" id="my-id-display">...</div>
-            <p style="font-size: 0.8rem; margin-bottom: 15px;">Скопируйте этот ID и отправьте другу,<br>или вставьте ID друга ниже.</p>
-            
-            <div style="border-top: 1px solid var(--border-color); margin: 15px 0;"></div>
-            
-            <input type="text" id="friend-id" placeholder="Вставьте ID друга сюда">
-            <button onclick="connectToFriend()">Подключиться</button>
-            <div class="status" id="status-msg">Ожидание подключения...</div>
+      <div class="section">
+        <label for="newRoomName">Название комнаты (опционально)</label>
+        <input id="newRoomName" placeholder="Например: Витамин - переговоры" />
+        <button class="btn" id="createRoomBtn" style="margin-top:8px;">Создать комнату</button>
+      </div>
+
+      <div class="section" style="flex:1;">
+        <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <strong>Доступные комнаты</strong>
+          <span class="badge" id="roomCount">0</span>
         </div>
-    </div>
+        <div class="list" id="roomsList"></div>
+      </div>
 
-    <div id="chat-app">
-        <header>
-            <div>
-                <span style="font-weight: bold;">Чат с собеседником</span><br>
-                <span style="font-size: 0.8rem; opacity: 0.7;" id="chat-status">Подключено</span>
-            </div>
-            <button onclick="toggleTheme()" style="width: auto; padding: 5px 15px; background: transparent; color: var(--text-color); border: 1px solid var(--border-color);">🌓</button>
-        </header>
+      <div class="section">
+        <label for="inviteCode">Код приглашения для текущей комнаты</label>
+        <div class="row" style="gap:6px;">
+          <input id="inviteCode" readonly placeholder="код комнаты будет здесь" />
+          <button class="btn secondary" id="copyCodeBtn">Копировать</button>
+        </div>
+      </div>
 
-        <div id="messages-area"></div>
+      <div class="section" style="margin-top:auto;">
+        <button class="btn secondary" id="toggleThemeBtn" title="Переключить тему">Темный режим</button>
+      </div>
+    </aside>
 
-        <footer>
-            <input type="text" id="msg-input" placeholder="Сообщение..." onkeypress="handleEnter(event)">
-            <button onclick="sendMessage()" style="width: auto; padding: 0 20px;">➤</button>
-        </footer>
-    </div>
+    <!-- Правая панель: чат выбранной комнаты -->
+    <section class="panel chat" id="chatPanel">
+      <div class="section" style="display:flex; justify-content: space-between; align-items: center;">
+        <div style="display:flex; align-items: center; gap: 8px;">
+          <strong id="currentRoomTitle">Выберите комнату</strong>
+          <span class="badge" id="currentRoomCode" title="Код комнаты"></span>
+        </div>
+        <div class="row" style="gap:6px;">
+          <input id="messageInput" placeholder="Напишите сообщение..." style="flex:1;" />
+          <button class="btn" id="sendBtn">Отправить</button>
+        </div>
+      </div>
 
-    <script>
-        let peer;
-        let conn;
-        let myName = '';
+      <div class="messages" id="messages"></div>
 
-        // Настройка темы
-        if (localStorage.getItem('theme') === 'dark') document.body.setAttribute('data-theme', 'dark');
-        function toggleTheme() {
-            const body = document.body;
-            const newTheme = body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-            body.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
-        }
+      <div class="section" style="display:flex; gap:8px;">
+        <textarea id="messagePreview" placeholder="Прокомментируйте..." style="flex:1; height:60px;"></textarea>
+        <button class="btn" id="addSampleBtn">Добавить пример</button>
+      </div>
+    </section>
+  </div>
 
-        // ШАГ 1: Инициализация
-        function initPeer() {
-            myName = document.getElementById('my-name').value.trim();
-            if (!myName) return alert("Введите имя!");
+  <script>
+    // Простые утилиты
+    function uid(len = 8) {
+      // простая генерация уникального кода
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let s = '';
+      for (let i = 0; i < len; i++) s += chars.charAt(Math.floor(Math.random() * chars.length));
+      return s;
+    }
 
-            document.getElementById('step-1').style.display = 'none';
-            document.getElementById('step-2').style.display = 'block';
-            document.getElementById('status-msg').innerHTML = '<div class="loader"></div> Генерация ID...';
+    function save(key, value) {
+      localStorage.setItem(key, JSON.stringify(value));
+    }
+    function load(key, fallback) {
+      try {
+        const v = localStorage.getItem(key);
+        return v ? JSON.parse(v) : fallback;
+      } catch {
+        return fallback;
+      }
+    }
 
-            // Создаем объект Peer (используем публичный сервер peerjs)
-            peer = new Peer(null, {
-                debug: 2
-            });
+    // Префикс для локального хранилища под этот экземпляр
+    const STORAGE_PREFIX = 'local.chat.app';
 
-            peer.on('open', (id) => {
-                document.getElementById('my-id-display').textContent = id;
-                document.getElementById('status-msg').textContent = 'Отправьте ваш ID другу или введите его ID.';
-                
-                // Автоматическое копирование при клике
-                document.getElementById('my-id-display').onclick = () => {
-                    navigator.clipboard.writeText(id);
-                    alert("ID скопирован!");
-                };
-            });
+    // Глобальные переменные
+    let currentUser = null;
+    let rooms = {}; // код -> { name, messages: [{from, text, ts}] }
+    let activeRoomCode = null;
+    let dark = true; // начальная тема — темная
 
-            // Если кто-то подключается к нам
-            peer.on('connection', (c) => {
-                conn = c;
-                setupConnection();
-            });
-            
-            peer.on('error', (err) => {
-                alert("Ошибка: " + err.type);
-            });
-        }
+    // Инициализация пользователя
+    function initUser() {
+      const existing = load(STORAGE_PREFIX + '.user', null);
+      if (existing && existing.uid) {
+        currentUser = existing;
+      } else {
+        currentUser = { uid: 'U' + uid(6), name: 'Пользователь ' + uid(4) };
+        save(STORAGE_PREFIX + '.user', currentUser);
+      }
+      document.getElementById('localUserUid').textContent = currentUser.uid;
+    }
 
-        // ШАГ 2: Подключение к другу
-        function connectToFriend() {
-            const friendId = document.getElementById('friend-id').value.trim();
-            if (!friendId) return alert("Введите ID друга!");
-            
-            document.getElementById('status-msg').innerHTML = '<div class="loader"></div> Подключение...';
-            
-            conn = peer.connect(friendId);
-            setupConnection();
-        }
+    // Загрузка комнат
+    function loadRooms() {
+      const r = load(STORAGE_PREFIX + '.rooms', {});
+      rooms = r;
+      // восстановим активную комнату если была
+      activeRoomCode = load(STORAGE_PREFIX + '.activeRoom', null);
+    }
 
-        // Настройка соединения (общая логика)
-        function setupConnection() {
-            conn.on('open', () => {
-                // Соединение установлено
-                document.getElementById('login-screen').style.display = 'none';
-                document.getElementById('chat-app').style.display = 'flex';
-                
-                // Отправляем наше имя сразу после подключения
-                conn.send({ type: 'system', text: myName + ' присоединился к чату' });
-            });
+    function persistRooms() {
+      save(STORAGE_PREFIX + '.rooms', rooms);
+      save(STORAGE_PREFIX + '.activeRoom', activeRoomCode);
+    }
 
-            conn.on('data', (data) => {
-                renderMessage(data, false);
-            });
+    // UI обновления
+    function renderRooms() {
+      const list = document.getElementById('roomsList');
+      list.innerHTML = '';
+      const codes = Object.keys(rooms);
+      codes.forEach(code => {
+        const item = document.createElement('div');
+        item.className = 'room-item' + (code === activeRoomCode ? ' active' : '');
+        item.style.cursor = 'pointer';
+        item.innerHTML = `
+          <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width: 180px;">
+            ${rooms[code].name || 'Комната ' + code}
+          </span>
+          <span class="badge" title="Код комнаты">${code}</span>
+        `;
+        item.addEventListener('click', () => switchRoom(code));
+        list.appendChild(item);
+      });
+      document.getElementById('roomCount').textContent = codes.length;
+    }
 
-            conn.on('close', () => {
-                alert("Собеседник покинул чат");
-                location.reload();
-            });
-        }
+    function renderMessages() {
+      const el = document.getElementById('messages');
+      el.innerHTML = '';
+      if (!activeRoomCode || !rooms[activeRoomCode]) return;
+      const msgs = rooms[activeRoomCode].messages || [];
+      msgs.forEach(m => {
+        const div = document.createElement('div');
+        div.className = 'message ' + (m.from === currentUser.uid ? 'me' : 'them');
+        div.textContent = `[${new Date(m.ts).toLocaleTimeString()}] ${m.from === currentUser.uid ? 'Вы' : m.from}: ${m.text}`;
+        el.appendChild(div);
+      });
+      el.scrollTop = el.scrollHeight;
+    }
 
-        // Отправка сообщений
-        function sendMessage() {
-            const input = document.getElementById('msg-input');
-            const text = input.value.trim();
-            if (!text || !conn) return;
+    function switchRoom(code) {
+      activeRoomCode = code;
+      save(STORAGE_PREFIX + '.activeRoom', activeRoomCode);
+      // визуальные обновления
+      document.getElementById('currentRoomTitle').textContent = rooms[code].name || 'Без названия';
+      document.getElementById('currentRoomCode').textContent = code;
+      renderRooms();
+      renderMessages();
+      // копируем код в инпут приглашения
+      document.getElementById('inviteCode').value = code;
+    }
 
-            const msgData = { type: 'message', user: myName, text: text };
-            
-            // Отображаем у себя
-            renderMessage(msgData, true);
-            // Отправляем другу
-            conn.send(msgData);
-            
-            input.value = '';
-        }
+    // Создать новую комнату
+    function createRoom() {
+      const nameInput = document.getElementById('newRoomName').value.trim();
+      const code = uid(6);
+      rooms[code] = {
+        code,
+        name: nameInput || ('Комната ' + code),
+        messages: []
+      };
+      persistRooms();
+      renderRooms();
+      switchRoom(code);
+      // генерируем приглашение сразу
+      document.getElementById('inviteCode').value = code;
+    }
 
-        function renderMessage(data, isMine) {
-            const area = document.getElementById('messages-area');
-            const div = document.createElement('div');
-            
-            if (data.type === 'system') {
-                div.style.textAlign = 'center';
-                div.style.fontSize = '0.8rem';
-                div.style.opacity = '0.6';
-                div.style.margin = '10px 0';
-                div.innerText = data.text;
-            } else {
-                div.className = `message ${isMine ? 'sent' : 'received'}`;
-                div.innerHTML = `
-                    <div style="font-size:0.7rem; margin-bottom:2px; opacity:0.8">${isMine ? 'Вы' : escapeHtml(data.user)}</div>
-                    ${escapeHtml(data.text)}
-                `;
-            }
-            
-            area.appendChild(div);
-            area.scrollTop = area.scrollHeight;
-        }
+    // Отправка сообщения
+    function sendMessage() {
+      if (!activeRoomCode || !rooms[activeRoomCode]) return;
+      const text = document.getElementById('messageInput').value.trim();
+      if (!text) return;
+      rooms[activeRoomCode].messages = rooms[activeRoomCode].messages || [];
+      rooms[activeRoomCode].messages.push({
+        from: currentUser.uid,
+        text,
+        ts: Date.now()
+      });
+      document.getElementById('messageInput').value = '';
+      persistRooms();
+      renderMessages();
+    }
 
-        function handleEnter(e) {
-            if (e.key === 'Enter') sendMessage();
-        }
+    // Примеры
+    function addSample() {
+      if (!activeRoomCode || !rooms[activeRoomCode]) return;
+      const samples = [
+        'Привет! Как дела?',
+        'Какие планы на сегодня?',
+        'Давай обсудим проект.',
+        'Мне нужен файл по задаче.'
+      ];
+      const pick = samples[Math.floor(Math.random() * samples.length)];
+      rooms[activeRoomCode].messages = rooms[activeRoomCode].messages || [];
+      rooms[activeRoomCode].messages.push({
+        from: 'system',
+        text: pick,
+        ts: Date.now()
+      });
+      persistRooms();
+      renderMessages();
+    }
 
-        function escapeHtml(text) {
-            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        }
-    </script>
+    // Темный режим переключение
+    function toggleTheme() {
+      // простая реализация: инвертируем переменные CSS
+      dark = !dark;
+      // минимальная смена темы на лету
+      if (dark) {
+        document.documentElement.style.setProperty('--bg', '#0e0f14');
+        document.documentElement.style.setProperty('--card', '#14181f');
+        document.documentElement.style.setProperty('--text', '#e6e6e6');
+        document.documentElement.style.setProperty('--input', '#1e232a');
+      } else {
+        // светлая тема
+        document.documentElement.style.setProperty('--bg', '#f6f7fb');
+        document.documentElement.style.setProperty('--card', '#ffffff');
+        document.documentElement.style.setProperty('--text', '#111827');
+        document.documentElement.style.setProperty('--input', '#f0f0f4');
+      }
+    }
+
+    // Привязка кнопок
+    document.getElementById('createRoomBtn').addEventListener('click', createRoom);
+    document.getElementById('sendBtn').addEventListener('click', sendMessage);
+    document.getElementById('copyCodeBtn').addEventListener('click', () => {
+      const code = document.getElementById('inviteCode').value;
+      if (!code) return;
+      navigator.clipboard.writeText(code).then(() => {
+        alert('Код скопирован: ' + code);
+      });
+    });
+    document.getElementById('addSampleBtn').addEventListener('click', addSample);
+    document.getElementById('toggleThemeBtn').addEventListener('click', () => {
+      toggleTheme();
+      document.getElementById('toggleThemeBtn').textContent = dark ? 'Темный режим' : 'Светлая тема';
+    });
+
+    // Обработка Enter для отправки
+    document.getElementById('messageInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    // Инициализация
+    (function init() {
+      initUser();
+      loadRooms();
+      // если есть активная комната в хранилище, откройте ее
+      if (activeRoomCode && rooms[activeRoomCode]) {
+        switchRoom(activeRoomCode);
+      } else {
+        // создаем одну пустую комнату по умолчанию если нет
+        const defCode = uid(6);
+        rooms[defCode] = { code: defCode, name: 'Локальная беседа', messages: [] };
+        activeRoomCode = defCode;
+        save(STORAGE_PREFIX + '.activeRoom', activeRoomCode);
+        persistRooms();
+        renderRooms();
+        switchRoom(defCode);
+      }
+      renderRooms();
+      renderMessages();
+      //初始 кнопка
+      document.getElementById('inviteCode').value = activeRoomCode || '';
+      document.getElementById('currentRoomCode').textContent = activeRoomCode || '';
+      // тема
+      document.getElementById('toggleThemeBtn').textContent = dark ? 'Темный режим' : 'Светлая тема';
+      // применяем стартовую тему
+      toggleTheme(); // применим базовую
+      // затем вернуть текущую тему в оригинальное состояние (только если нужно)
+    })();
+  </script>
 </body>
 </html>
