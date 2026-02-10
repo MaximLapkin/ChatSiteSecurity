@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Приватный чат через localStorage</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 900px;
+            background-color: rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 85vh;
+        }
+        
+        header {
+            background-color: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        h1 {
+            font-size: 28px;
+            margin-bottom: 5px;
+            color: #4cc9f0;
+        }
+        
+        .subtitle {
+            color: #aaa;
+            font-size: 14px;
+        }
+        
+        .main-content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        
+        /* Панель управления */
+        .control-panel {
+            width: 300px;
+            padding: 25px;
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            background-color: rgba(0, 0, 0, 0.2);
+        }
+        
+        .panel-title {
+            font-size: 20px;
+            margin-bottom: 20px;
+            color: #f72585;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .panel-title i {
+            font-size: 22px;
+        }
+        
+        .status-container {
+            margin-bottom: 30px;
+            padding: 15px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            border-left: 4px solid #4361ee;
+        }
+        
+        .status-label {
+            font-size: 14px;
+            color: #aaa;
+            margin-bottom: 5px;
+        }
+        
+        .status-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #4cc9f0;
+        }
+        
+        .code-display {
+            background-color: rgba(0, 0, 0, 0.4);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 20px;
+            border: 1px dashed #4361ee;
+            display: none;
+        }
+        
+        .code-display.active {
+            display: block;
+        }
+        
+        .code {
+            font-size: 32px;
+            letter-spacing: 5px;
+            font-weight: bold;
+            color: #f72585;
+            margin: 10px 0;
+        }
+        
+        .connection-info {
+            background-color: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            border-left: 4px solid #f72585;
+            font-size: 14px;
+        }
+        
+        .connection-info.hidden {
+            display: none;
+        }
+        
+        .instructions {
+            background-color: rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            font-size: 13px;
+            line-height: 1.5;
+            border: 1px dashed #4cc9f0;
+        }
+        
+        .instructions h4 {
+            color: #4cc9f0;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn {
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .btn-primary {
+            background-color: #4361ee;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #3a56d4;
+            transform: translateY(-2px);
+        }
+        
+        .btn-secondary {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .btn-secondary:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        .btn-danger {
+            background-color: #f72585;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background-color: #e01e75;
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        .input-label {
+            display: block;
+            margin-bottom: 8px;
+            color: #aaa;
+        }
+        
+        .input-field {
+            width: 100%;
+            padding: 14px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            color: white;
+            font-size: 16px;
+        }
+        
+        .input-field:focus {
+            outline: none;
+            border-color: #4361ee;
+        }
+        
+        /* Область чата */
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 0;
+            overflow: hidden;
+        }
+        
+        .chat-header {
+            padding: 20px;
+            background-color: rgba(0, 0, 0, 0.2);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .chat-title {
+            font-size: 22px;
+            color: #4cc9f0;
+        }
+        
+        .participants {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #aaa;
+        }
+        
+        .participant-count {
+            background-color: #4361ee;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+        }
+        
+        .messages-container {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            background-color: rgba(0, 0, 0, 0.1);
+        }
+        
+        .message {
+            max-width: 75%;
+            padding: 15px;
+            border-radius: 15px;
+            position: relative;
+            word-wrap: break-word;
+        }
+        
+        .message-host {
+            align-self: flex-end;
+            background-color: #4361ee;
+            border-bottom-right-radius: 5px;
+        }
+        
+        .message-guest {
+            align-self: flex-start;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-bottom-left-radius: 5px;
+        }
+        
+        .message-system {
+            align-self: center;
+            background-color: rgba(247, 37, 133, 0.2);
+            color: #f72585;
+            text-align: center;
+            max-width: 90%;
+            font-size: 14px;
+            padding: 10px 20px;
+            border-radius: 20px;
+        }
+        
+        .message-sender {
+            font-weight: bold;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+        
+        .message-host .message-sender {
+            color: #b6c4ff;
+        }
+        
+        .message-guest .message-sender {
+            color: #aaa;
+        }
+        
+        .message-text {
+            line-height: 1.5;
+        }
+        
+        .message-time {
+            font-size: 12px;
+            opacity: 0.7;
+            margin-top: 8px;
+            text-align: right;
+        }
+        
+        .input-container {
+            padding: 20px;
+            background-color: rgba(0, 0, 0, 0.2);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            gap: 15px;
+        }
+        
+        .message-input {
+            flex: 1;
+            padding: 15px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            color: white;
+            font-size: 16px;
+        }
+        
+        .message-input:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .send-btn {
+            padding: 15px 25px;
+            background-color: #4361ee;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .send-btn:hover:not(:disabled) {
+            background-color: #3a56d4;
+        }
+        
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .empty-chat {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #666;
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .empty-chat i {
+            font-size: 60px;
+            margin-bottom: 20px;
+            color: #444;
+        }
+        
+        .empty-chat h3 {
+            margin-bottom: 10px;
+            color: #aaa;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 10px;
+            background-color: #4361ee;
+            color: white;
+            font-weight: bold;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        .notification.warning {
+            background-color: #f72585;
+        }
+        
+        .notification.success {
+            background-color: #4cc9f0;
+        }
+        
+        .notification.info {
+            background-color: #7209b7;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #aaa;
+        }
+        
+        .status-indicator.connected {
+            background-color: #4cc9f0;
+            box-shadow: 0 0 10px #4cc9f0;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .status-indicator.disconnected {
+            background-color: #f72585;
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                flex-direction: column;
+            }
+            
+            .control-panel {
+                width: 100%;
+                border-right: none;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            }
+            
+            .container {
+                height: 90vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-comments"></i> Приватный чат через localStorage</h1>
+            <p class="subtitle">Обмен сообщениями через браузерное хранилище</p>
+        </header>
+        
+        <div class="main-content">
+            <!-- Панель управления -->
+            <div class="control-panel">
+                <div class="panel-title">
+                    <i class="fas fa-cogs"></i> Управление
+                </div>
+                
+                <div class="connection-status">
+                    <div class="status-indicator disconnected" id="connectionIndicator"></div>
+                    <span id="connectionStatus">Не подключено</span>
+                </div>
+                
+                <div class="status-container">
+                    <div class="status-label">Статус</div>
+                    <div class="status-value" id="statusText">Не подключен</div>
+                </div>
+                
+                <div class="code-display" id="codeDisplay">
+                    <div class="status-label">Код комнаты</div>
+                    <div class="code" id="roomCode">0000</div>
+                    <div class="status-label">Отправьте этот код собеседнику</div>
+                </div>
+                
+                <div class="connection-info" id="connectionInfo">
+                    <div class="status-label">Технология: localStorage синхронизация</div>
+                    <p style="margin-top: 5px; font-size: 12px;">Сообщения синхронизируются через браузерное хранилище</p>
+                </div>
+                
+                <div class="instructions">
+                    <h4><i class="fas fa-info-circle"></i> Как это работает:</h4>
+                    <p>1. Хост создает комнату и получает код</p>
+                    <p>2. Гость вводит код и присоединяется</p>
+                    <p>3. Сообщения сохраняются в localStorage</p>
+                    <p>4. Оба устройства проверяют обновления каждые 2 секунды</p>
+                </div>
+                
+                <div class="input-group">
+                    <label class="input-label" for="roomCodeInput">Код для подключения</label>
+                    <input type="text" id="roomCodeInput" class="input-field" placeholder="Введите 4-значный код" maxlength="4">
+                </div>
+                
+                <button class="btn btn-primary" id="createRoomBtn">
+                    <i class="fas fa-plus-circle"></i> Создать комнату (Хост)
+                </button>
+                
+                <button class="btn btn-secondary" id="joinRoomBtn">
+                    <i class="fas fa-sign-in-alt"></i> Присоединиться (Гость)
+                </button>
+                
+                <button class="btn btn-danger" id="leaveRoomBtn">
+                    <i class="fas fa-sign-out-alt"></i> Покинуть комнату
+                </button>
+            </div>
+            
+            <!-- Область чата -->
+            <div class="chat-area">
+                <div class="chat-header">
+                    <div class="chat-title" id="chatTitle">Чат</div>
+                    <div class="participants">
+                        <i class="fas fa-users"></i>
+                        <span>Участники: </span>
+                        <div class="participant-count" id="participantCount">0</div>
+                    </div>
+                </div>
+                
+                <div class="messages-container" id="messagesContainer">
+                    <div class="empty-chat" id="emptyChat">
+                        <i class="fas fa-comment-slash"></i>
+                        <h3>Чат пуст</h3>
+                        <p>Создайте комнату или присоединитесь к существующей, чтобы начать общение</p>
+                    </div>
+                    
+                    <!-- Сообщения будут добавляться сюда -->
+                </div>
+                
+                <div class="input-container">
+                    <input type="text" class="message-input" id="messageInput" placeholder="Введите сообщение..." disabled>
+                    <button class="send-btn" id="sendBtn" disabled>
+                        <i class="fas fa-paper-plane"></i> Отправить
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Простой чат через localStorage (имитация сервера)
+        class SimpleChat {
+            constructor() {
+                this.roomCode = null;
+                this.role = null; // 'host' или 'guest'
+                this.messages = [];
+                this.connected = false;
+                this.updateInterval = null;
+                this.userId = this.generateUserId();
+                this.lastMessageId = 0;
+            }
+            
+            // Генерация ID пользователя
+            generateUserId() {
+                return 'user_' + Math.random().toString(36).substr(2, 9);
+            }
+            
+            // Генерация 4-значного кода
+            generateRoomCode() {
+                return Math.floor(1000 + Math.random() * 9000).toString();
+            }
+            
+            // Создание комнаты (Хост)
+            createRoom() {
+                this.roomCode = this.generateRoomCode();
+                this.role = 'host';
+                this.connected = true;
+                
+                // Создаем запись о комнате в localStorage
+                const roomData = {
+                    code: this.roomCode,
+                    host: this.userId,
+                    guest: null,
+                    hostOnline: true,
+                    guestOnline: false,
+                    created: Date.now(),
+                    lastActivity: Date.now()
+                };
+                
+                localStorage.setItem(`chat_room_${this.roomCode}`, JSON.stringify(roomData));
+                
+                // Создаем запись для сообщений
+                localStorage.setItem(`chat_messages_${this.roomCode}`, JSON.stringify([]));
+                
+                // Сохраняем информацию о текущей комнате
+                this.saveCurrentRoomInfo();
+                
+                // Запускаем проверку обновлений
+                this.startUpdateInterval();
+                
+                console.log('Хост создал комнату:', this.roomCode);
+                return this.roomCode;
+            }
+            
+            // Присоединение к комнате (Гость)
+            joinRoom(code) {
+                if (!code || code.length !== 4) {
+                    return false;
+                }
+                
+                // Проверяем, существует ли комната
+                const roomDataStr = localStorage.getItem(`chat_room_${code}`);
+                if (!roomDataStr) {
+                    console.log('Комната не найдена:', code);
+                    return false;
+                }
+                
+                try {
+                    const roomData = JSON.parse(roomDataStr);
+                    
+                    // Проверяем, не устарела ли комната (больше 30 минут)
+                    const roomAge = Date.now() - roomData.created;
+                    if (roomAge > 30 * 60 * 1000) {
+                        console.log('Комната устарела:', roomAge);
+                        localStorage.removeItem(`chat_room_${code}`);
+                        localStorage.removeItem(`chat_messages_${code}`);
+                        return false;
+                    }
+                    
+                    this.roomCode = code;
+                    this.role = 'guest';
+                    this.connected = true;
+                    
+                    // Обновляем данные комнаты
+                    roomData.guest = this.userId;
+                    roomData.guestOnline = true;
+                    roomData.lastActivity = Date.now();
+                    localStorage.setItem(`chat_room_${code}`, JSON.stringify(roomData));
+                    
+                    // Сохраняем информацию о текущей комнате
+                    this.saveCurrentRoomInfo();
+                    
+                    // Загружаем существующие сообщения
+                    this.loadMessages();
+                    
+                    // Запускаем проверку обновлений
+                    this.startUpdateInterval();
+                    
+                    console.log('Гость присоединился к комнате:', this.roomCode);
+                    return true;
+                    
+                } catch (error) {
+                    console.error('Ошибка при присоединении к комнате:', error);
+                    return false;
+                }
+            }
+            
+            // Загрузка сообщений из localStorage
+            loadMessages() {
+                try {
+                    const messagesStr = localStorage.getItem(`chat_messages_${this.roomCode}`);
+                    if (messagesStr) {
+                        this.messages = JSON.parse(messagesStr) || [];
+                        this.lastMessageId = this.messages.length;
+                    }
+                } catch (error) {
+                    console.error('Ошибка загрузки сообщений:', error);
+                    this.messages = [];
+                }
+            }
+            
+            // Сохранение информации о текущей комнате
+            saveCurrentRoomInfo() {
+                const info = {
+                    roomCode: this.roomCode,
+                    role: this.role,
+                    userId: this.userId,
+                    lastMessageId: this.lastMessageId
+                };
+                
+                localStorage.setItem('current_chat_info', JSON.stringify(info));
+            }
+            
+            // Обновление статуса активности
+            updateActivityStatus() {
+                if (!this.roomCode) return;
+                
+                try {
+                    const roomDataStr = localStorage.getItem(`chat_room_${this.roomCode}`);
+                    if (!roomDataStr) return;
+                    
+                    const roomData = JSON.parse(roomDataStr);
+                    roomData.lastActivity = Date.now();
+                    
+                    if (this.role === 'host') {
+                        roomData.hostOnline = true;
+                    } else if (this.role === 'guest') {
+                        roomData.guestOnline = true;
+                    }
+                    
+                    localStorage.setItem(`chat_room_${this.roomCode}`, JSON.stringify(roomData));
+                } catch (error) {
+                    console.error('Ошибка обновления статуса:', error);
+                }
+            }
+            
+            // Проверка наличия новых сообщений
+            checkForNewMessages() {
+                if (!this.roomCode) return;
+                
+                try {
+                    // Проверяем статус собеседника
+                    const roomDataStr = localStorage.getItem(`chat_room_${this.roomCode}`);
+                    if (!roomDataStr) {
+                        // Комната удалена
+                        this.handleRoomDeleted();
+                        return;
+                    }
+                    
+                    const roomData = JSON.parse(roomDataStr);
+                    
+                    // Проверяем, не отключился ли собеседник
+                    const timeSinceLastActivity = Date.now() - roomData.lastActivity;
+                    if (timeSinceLastActivity > 15000) { // 15 секунд
+                        if (this.role === 'host' && roomData.guestOnline) {
+                            roomData.guestOnline = false;
+                            localStorage.setItem(`chat_room_${this.roomCode}`, JSON.stringify(roomData));
+                            this.addSystemMessage('Собеседник отключился');
+                            updateParticipantCount(1);
+                        } else if (this.role === 'guest' && roomData.hostOnline) {
+                            roomData.hostOnline = false;
+                            localStorage.setItem(`chat_room_${this.roomCode}`, JSON.stringify(roomData));
+                            this.addSystemMessage('Хост отключился');
+                            updateParticipantCount(0);
+                        }
+                    } else {
+                        // Собеседник онлайн
+                        const participantCount = (roomData.hostOnline ? 1 : 0) + (roomData.guestOnline ? 1 : 0);
+                        updateParticipantCount(participantCount);
+                    }
+                    
+                    // Проверяем новые сообщения
+                    const messagesStr = localStorage.getItem(`chat_messages_${this.roomCode}`);
+                    if (!messagesStr) return;
+                    
+                    const allMessages = JSON.parse(messagesStr) || [];
+                    
+                    if (allMessages.length > this.lastMessageId) {
+                        // Есть новые сообщения
+                        const newMessages = allMessages.slice(this.lastMessageId);
+                        
+                        newMessages.forEach(msg => {
+                            // Показываем только сообщения от другого пользователя
+                            if (msg.userId !== this.userId) {
+                                this.messages.push(msg);
+                                displayMessage({
+                                    sender: msg.role === 'host' ? 'Хост' : 'Участник',
+                                    text: msg.text,
+                                    time: msg.time
+                                });
+                                
+                                // Показываем уведомление для новых сообщений
+                                if (document.hidden) {
+                                    showNotification(`Новое сообщение от ${msg.role === 'host' ? 'Хоста' : 'Участника'}`, 'info');
+                                }
+                            }
+                        });
+                        
+                        this.lastMessageId = allMessages.length;
+                        this.saveCurrentRoomInfo();
+                    }
+                    
+                } catch (error) {
+                    console.error('Ошибка проверки сообщений:', error);
+                }
+            }
+            
+            // Обработка удаления комнаты
+            handleRoomDeleted() {
+                if (this.role === 'guest') {
+                    this.addSystemMessage('Хост удалил комнату');
+                    showNotification('Хост удалил комнату', 'warning');
+                }
+                this.leaveRoom();
+            }
+            
+            // Отправка сообщения
+            sendMessage(text) {
+                if (!this.connected || !this.roomCode) {
+                    showNotification('Нет подключения к комнате', 'warning');
+                    return null;
+                }
+                
+                const message = {
+                    sender: this.role === 'host' ? 'Хост' : 'Участник',
+                    text: text,
+                    time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+                };
+                
+                // Сохраняем сообщение в localStorage
+                try {
+                    const messagesStr = localStorage.getItem(`chat_messages_${this.roomCode}`);
+                    const allMessages = messagesStr ? JSON.parse(messagesStr) : [];
+                    
+                    const fullMessage = {
+                        id: allMessages.length + 1,
+                        userId: this.userId,
+                        role: this.role,
+                        text: text,
+                        time: message.time,
+                        timestamp: Date.now()
+                    };
+                    
+                    allMessages.push(fullMessage);
+                    localStorage.setItem(`chat_messages_${this.roomCode}`, JSON.stringify(allMessages));
+                    
+                    // Обновляем активность
+                    this.updateActivityStatus();
+                    
+                    // Обновляем локальный счетчик сообщений
+                    this.lastMessageId = allMessages.length;
+                    this.saveCurrentRoomInfo();
+                    
+                    // Добавляем в локальный массив
+                    this.messages.push(message);
+                    
+                    console.log('Сообщение отправлено:', fullMessage);
+                    return message;
+                    
+                } catch (error) {
+                    console.error('Ошибка отправки сообщения:', error);
+                    showNotification('Ошибка отправки сообщения', 'warning');
+                    return null;
+                }
+            }
+            
+            // Добавление системного сообщения
+            addSystemMessage(text) {
+                const message = {
+                    sender: 'Система',
+                    text: text,
+                    time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                    system: true
+                };
+                
+                this.messages.push(message);
+                displayMessage(message);
+            }
+            
+            // Запуск интервала проверки обновлений
+            startUpdateInterval() {
+                if (this.updateInterval) {
+                    clearInterval(this.updateInterval);
+                }
+                
+                this.updateInterval = setInterval(() => {
+                    this.checkForNewMessages();
+                    this.updateActivityStatus();
+                }, 2000); // Проверяем каждые 2 секунды
+            }
+            
+            // Покинуть комнату
+            leaveRoom() {
+                // Обновляем статус в комнате
+                if (this.roomCode) {
+                    try {
+                        const roomDataStr = localStorage.getItem(`chat_room_${this.roomCode}`);
+                        if (roomDataStr) {
+                            const roomData = JSON.parse(roomDataStr);
+                            
+                            if (this.role === 'host') {
+                                roomData.hostOnline = false;
+                                // Если хост выходит, удаляем комнату через 5 минут
+                                roomData.host = null;
+                            } else if (this.role === 'guest') {
+                                roomData.guestOnline = false;
+                                roomData.guest = null;
+                            }
+                            
+                            localStorage.setItem(`chat_room_${this.roomCode}`, JSON.stringify(roomData));
+                        }
+                    } catch (error) {
+                        console.error('Ошибка при выходе из комнаты:', error);
+                    }
+                }
+                
+                // Останавливаем интервал
+                if (this.updateInterval) {
+                    clearInterval(this.updateInterval);
+                    this.updateInterval = null;
+                }
+                
+                // Очищаем информацию о текущей комнате
+                localStorage.removeItem('current_chat_info');
+                
+                // Очищаем состояние
+                this.roomCode = null;
+                this.role = null;
+                this.messages = [];
+                this.connected = false;
+            }
+            
+            // Очистка устаревших комнат
+            cleanupOldRooms() {
+                const now = Date.now();
+                
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('chat_room_')) {
+                        try {
+                            const data = JSON.parse(localStorage.getItem(key));
+                            const roomAge = now - data.lastActivity;
+                            
+                            // Удаляем комнаты, которые неактивны более 30 минут
+                            if (roomAge > 30 * 60 * 1000) {
+                                const roomCode = key.replace('chat_room_', '');
+                                localStorage.removeItem(key);
+                                localStorage.removeItem(`chat_messages_${roomCode}`);
+                            }
+                        } catch (e) {
+                            // Игнорируем ошибки парсинга
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Создаем экземпляр чата
+        const chat = new SimpleChat();
+        
+        // Элементы DOM
+        const statusText = document.getElementById('statusText');
+        const roomCodeElement = document.getElementById('roomCode');
+        const codeDisplay = document.getElementById('codeDisplay');
+        const roomCodeInput = document.getElementById('roomCodeInput');
+        const createRoomBtn = document.getElementById('createRoomBtn');
+        const joinRoomBtn = document.getElementById('joinRoomBtn');
+        const leaveRoomBtn = document.getElementById('leaveRoomBtn');
+        const chatTitle = document.getElementById('chatTitle');
+        const participantCount = document.getElementById('participantCount');
+        const messagesContainer = document.getElementById('messagesContainer');
+        const emptyChat = document.getElementById('emptyChat');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const connectionIndicator = document.getElementById('connectionIndicator');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const connectionInfo = document.getElementById('connectionInfo');
+        
+        // Создание комнаты
+        createRoomBtn.addEventListener('click', () => {
+            try {
+                const code = chat.createRoom();
+                
+                roomCodeElement.textContent = code;
+                codeDisplay.classList.add('active');
+                connectionInfo.classList.remove('hidden');
+                
+                statusText.textContent = 'Хост комнаты';
+                statusText.style.color = '#4cc9f0';
+                
+                chatTitle.textContent = `Комната: ${code}`;
+                
+                // Обновляем статус соединения
+                updateConnectionStatus(true);
+                
+                // Активируем чат
+                activateChat();
+                
+                // Показываем уведомление
+                showNotification('Комната создана! Отправьте код собеседнику.', 'success');
+                
+                // Обновляем количество участников
+                updateParticipantCount(1);
+                
+                // Добавляем системное сообщение
+                chat.addSystemMessage('Вы создали комнату. Ожидайте подключения гостя.');
+                
+                // Запускаем периодическую очистку старых комнат
+                setInterval(() => chat.cleanupOldRooms(), 60000);
+                
+            } catch (error) {
+                console.error('Ошибка создания комнаты:', error);
+                showNotification('Ошибка создания комнаты: ' + error.message, 'warning');
+            }
+        });
+        
+        // Присоединение к комнате
+        joinRoomBtn.addEventListener('click', () => {
+            const code = roomCodeInput.value.trim();
+            
+            if (!code || code.length !== 4) {
+                showNotification('Введите 4-значный код комнаты', 'warning');
+                return;
+            }
+            
+            const success = chat.joinRoom(code);
+            
+            if (success) {
+                statusText.textContent = 'Участник комнаты';
+                statusText.style.color = '#f72585';
+                
+                chatTitle.textContent = `Комната: ${code}`;
+                connectionInfo.classList.remove('hidden');
+                
+                // Обновляем статус соединения
+                updateConnectionStatus(true);
+                
+                // Активируем чат
+                activateChat();
+                
+                // Показываем уведомление
+                showNotification('Вы успешно присоединились к комнате!', 'success');
+                
+                // Обновляем количество участников
+                updateParticipantCount(2);
+                
+                // Добавляем системное сообщение
+                chat.addSystemMessage('Вы присоединились к комнате. Ожидайте сообщений от хоста.');
+                
+                // Загружаем существующие сообщения
+                chat.messages.forEach(msg => {
+                    if (!msg.system) {
+                        displayMessage(msg);
+                    }
+                });
+                
+            } else {
+                showNotification('Не удалось присоединиться. Проверьте код комнаты.', 'warning');
+            }
+        });
+        
+        // Покинуть комнату
+        leaveRoomBtn.addEventListener('click', () => {
+            chat.leaveRoom();
+            
+            statusText.textContent = 'Не подключен';
+            statusText.style.color = '#4cc9f0';
+            
+            codeDisplay.classList.remove('active');
+            connectionInfo.classList.add('hidden');
+            chatTitle.textContent = 'Чат';
+            
+            // Обновляем статус соединения
+            updateConnectionStatus(false);
+            
+            // Деактивируем чат
+            deactivateChat();
+            
+            // Очищаем сообщения
+            clearMessages();
+            
+            // Сбрасываем количество участников
+            updateParticipantCount(0);
+            
+            showNotification('Вы покинули комнату', 'warning');
+        });
+        
+        // Отправка сообщения
+        sendBtn.addEventListener('click', sendMessageHandler);
+        
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessageHandler();
+            }
+        });
+        
+        function sendMessageHandler() {
+            const text = messageInput.value.trim();
+            
+            if (!text) return;
+            
+            const message = chat.sendMessage(text);
+            
+            if (message) {
+                // Отображаем сообщение
+                displayMessage(message);
+                
+                // Очищаем поле ввода
+                messageInput.value = '';
+                
+                // Прокручиваем вниз
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+        }
+        
+        // Функция активации чата
+        function activateChat() {
+            messageInput.disabled = false;
+            sendBtn.disabled = false;
+            emptyChat.classList.add('hidden');
+            updateConnectionStatus(true);
+        }
+        
+        // Функция деактивации чата
+        function deactivateChat() {
+            messageInput.disabled = true;
+            sendBtn.disabled = true;
+            emptyChat.classList.remove('hidden');
+            updateConnectionStatus(false);
+        }
+        
+        // Функция отображения сообщения
+        function displayMessage(message) {
+            const messageElement = document.createElement('div');
+            
+            if (message.system) {
+                messageElement.classList.add('message', 'message-system');
+                messageElement.innerHTML = `
+                    <div class="message-text">${message.text}</div>
+                    <div class="message-time">${message.time}</div>
+                `;
+            } else {
+                const sender = message.sender;
+                const isHost = sender === 'Хост';
+                
+                messageElement.classList.add('message', isHost ? 'message-host' : 'message-guest');
+                
+                messageElement.innerHTML = `
+                    <div class="message-sender">${sender}</div>
+                    <div class="message-text">${message.text}</div>
+                    <div class="message-time">${message.time}</div>
+                `;
+            }
+            
+            messagesContainer.appendChild(messageElement);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+        
+        // Функция очистки сообщений
+        function clearMessages() {
+            // Удаляем все сообщения, кроме пустого состояния
+            const messages = messagesContainer.querySelectorAll('.message');
+            messages.forEach(message => message.remove());
+            
+            emptyChat.classList.remove('hidden');
+        }
+        
+        // Функция обновления количества участников
+        function updateParticipantCount(count) {
+            participantCount.textContent = count;
+        }
+        
+        // Функция обновления статуса соединения
+        function updateConnectionStatus(connected) {
+            connectionIndicator.className = 'status-indicator ' + (connected ? 'connected' : 'disconnected');
+            connectionStatus.textContent = connected ? 'Подключено' : 'Нет подключения';
+        }
+        
+        // Функция показа уведомления
+        function showNotification(text, type = '') {
+            // Удаляем предыдущее уведомление, если есть
+            const existingNotification = document.querySelector('.notification');
+            if (existingNotification) {
+                existingNotification.remove();
+            }
+            
+            const notification = document.createElement('div');
+            notification.classList.add('notification');
+            if (type) {
+                notification.classList.add(type);
+            }
+            notification.textContent = text;
+            
+            document.body.appendChild(notification);
+            
+            // Удаляем уведомление через 3 секунды
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+        
+        // Восстановление состояния комнаты при загрузке страницы
+        function restoreRoomState() {
+            try {
+                const roomInfo = localStorage.getItem('current_chat_info');
+                
+                if (roomInfo) {
+                    const info = JSON.parse(roomInfo);
+                    
+                    chat.roomCode = info.roomCode;
+                    chat.role = info.role;
+                    chat.userId = info.userId;
+                    chat.lastMessageId = info.lastMessageId || 0;
+                    
+                    // Загружаем сообщения
+                    chat.loadMessages();
+                    
+                    if (info.role === 'host') {
+                        // Восстанавливаем состояние хоста
+                        roomCodeElement.textContent = info.roomCode;
+                        codeDisplay.classList.add('active');
+                        connectionInfo.classList.remove('hidden');
+                        statusText.textContent = 'Хост комнаты';
+                        chatTitle.textContent = `Комната: ${info.roomCode}`;
+                        
+                        // Проверяем, активна ли еще комната
+                        const roomDataStr = localStorage.getItem(`chat_room_${info.roomCode}`);
+                        if (roomDataStr) {
+                            const roomData = JSON.parse(roomDataStr);
+                            const roomAge = Date.now() - roomData.lastActivity;
+                            
+                            if (roomAge < 30 * 60 * 1000) {
+                                // Комната активна
+                                chat.connected = true;
+                                activateChat();
+                                chat.startUpdateInterval();
+                                updateParticipantCount(roomData.guestOnline ? 2 : 1);
+                                
+                                // Показываем загруженные сообщения
+                                chat.messages.forEach(msg => displayMessage(msg));
+                            } else {
+                                // Комната устарела
+                                chat.leaveRoom();
+                            }
+                        } else {
+                            // Комната не найдена
+                            chat.leaveRoom();
+                        }
+                        
+                    } else if (info.role === 'guest') {
+                        // Восстанавливаем состояние гостя
+                        statusText.textContent = 'Участник комнаты';
+                        chatTitle.textContent = `Комната: ${info.roomCode}`;
+                        connectionInfo.classList.remove('hidden');
+                        
+                        // Проверяем, активна ли еще комната
+                        const roomDataStr = localStorage.getItem(`chat_room_${info.roomCode}`);
+                        if (roomDataStr) {
+                            const roomData = JSON.parse(roomDataStr);
+                            const roomAge = Date.now() - roomData.lastActivity;
+                            
+                            if (roomAge < 30 * 60 * 1000) {
+                                // Комната активна
+                                chat.connected = true;
+                                activateChat();
+                                chat.startUpdateInterval();
+                                updateParticipantCount(roomData.hostOnline ? 2 : 1);
+                                
+                                // Показываем загруженные сообщения
+                                chat.messages.forEach(msg => displayMessage(msg));
+                            } else {
+                                // Комната устарела
+                                chat.leaveRoom();
+                            }
+                        } else {
+                            // Комната не найдена
+                            chat.leaveRoom();
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Ошибка восстановления состояния:', error);
+                chat.leaveRoom();
+            }
+        }
+        
+        // Инициализация
+        function init() {
+            // Ограничиваем ввод кода комнаты только цифрами
+            roomCodeInput.addEventListener('input', () => {
+                roomCodeInput.value = roomCodeInput.value.replace(/\D/g, '');
+            });
+            
+            // Восстанавливаем состояние комнаты при загрузке
+            restoreRoomState();
+            
+            // Очищаем старые комнаты при загрузке
+            chat.cleanupOldRooms();
+            
+            // Обновляем статус соединения
+            updateConnectionStatus(chat.connected);
+        }
+        
+        // Запускаем инициализацию при загрузке страницы
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
