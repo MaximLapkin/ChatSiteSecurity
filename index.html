@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LocalStorage Chat</title>
+    <title>P2P Internet Chat</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         :root {
             --bg-color: #ffffff;
             --chat-bg: #f0f2f5;
             --sidebar-bg: #ffffff;
             --text-color: #050505;
-            --input-bg: #f0f2f5;
             --primary-color: #0084ff;
             --received-msg-bg: #e4e6eb;
             --sent-msg-text: #ffffff;
@@ -22,284 +22,227 @@
             --chat-bg: #242526;
             --sidebar-bg: #242526;
             --text-color: #e4e6eb;
-            --input-bg: #3a3b3c;
             --primary-color: #2d88ff;
             --received-msg-bg: #3a3b3c;
             --sent-msg-text: #ffffff;
             --border-color: #3e4042;
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        
-        body { background-color: var(--bg-color); color: var(--text-color); height: 100vh; display: flex; transition: 0.3s; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-color); height: 100vh; display: flex; overflow: hidden; }
 
-        /* Экран входа */
+        /* ЭКРАН ВХОДА */
         #login-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: var(--bg-color); z-index: 100;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            display: flex; align-items: center; justify-content: center;
         }
-
         .card {
-            background: var(--sidebar-bg); padding: 2rem; border-radius: 10px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: 90%; max-width: 400px;
+            background: var(--sidebar-bg); padding: 2rem; border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1); width: 90%; max-width: 400px;
             text-align: center; border: 1px solid var(--border-color);
         }
-
         input {
-            width: 100%; padding: 12px; margin: 10px 0; border-radius: 5px;
-            border: 1px solid var(--border-color); background: var(--input-bg);
+            width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px;
+            border: 1px solid var(--border-color); background: var(--chat-bg);
             color: var(--text-color); outline: none;
         }
-
         button {
-            width: 100%; padding: 12px; border: none; border-radius: 5px;
+            width: 100%; padding: 12px; border: none; border-radius: 8px;
             background: var(--primary-color); color: white; font-weight: bold;
-            cursor: pointer; margin-top: 5px; transition: 0.2s;
+            cursor: pointer; margin-top: 5px; font-size: 1rem;
         }
-        button:hover { opacity: 0.9; }
-        button.secondary { background: transparent; border: 1px solid var(--primary-color); color: var(--primary-color); }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .status { margin-top: 10px; font-size: 0.9rem; color: #888; min-height: 20px;}
 
-        /* Основной интерфейс чата */
+        /* ЧАТ */
         #chat-app { display: none; width: 100%; height: 100%; flex-direction: column; }
-
         header {
             padding: 15px; background: var(--sidebar-bg); border-bottom: 1px solid var(--border-color);
             display: flex; justify-content: space-between; align-items: center;
         }
-        
-        .room-info { font-size: 0.9rem; }
-        .room-code { font-weight: bold; color: var(--primary-color); cursor: pointer; }
-
         #messages-area {
             flex: 1; overflow-y: auto; padding: 20px; background: var(--chat-bg);
             display: flex; flex-direction: column; gap: 10px;
         }
-
         .message {
-            max-width: 70%; padding: 10px 15px; border-radius: 18px; font-size: 0.95rem;
-            position: relative; line-height: 1.4; word-wrap: break-word;
+            max-width: 75%; padding: 10px 15px; border-radius: 18px; font-size: 0.95rem;
+            line-height: 1.4; word-wrap: break-word;
         }
-
-        .message.sent {
-            align-self: flex-end; background: var(--primary-color); color: var(--sent-msg-text);
-            border-bottom-right-radius: 2px;
-        }
-
-        .message.received {
-            align-self: flex-start; background: var(--received-msg-bg); color: var(--text-color);
-            border-bottom-left-radius: 2px;
-        }
-
-        .meta { font-size: 0.7rem; opacity: 0.7; margin-bottom: 2px; display: block; }
-
-        footer {
-            padding: 15px; background: var(--sidebar-bg); border-top: 1px solid var(--border-color);
-            display: flex; gap: 10px;
-        }
-
-        /* Утилиты */
-        .theme-toggle { background: none; border: none; font-size: 1.5rem; width: auto; color: var(--text-color); }
-        .hidden { display: none !important; }
+        .sent { align-self: flex-end; background: var(--primary-color); color: var(--sent-msg-text); border-bottom-right-radius: 2px; }
+        .received { align-self: flex-start; background: var(--received-msg-bg); color: var(--text-color); border-bottom-left-radius: 2px; }
         
-        /* Скроллбар */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
-        ::-webkit-scrollbar-track { background: transparent; }
+        footer { padding: 15px; background: var(--sidebar-bg); display: flex; gap: 10px; border-top: 1px solid var(--border-color); }
+        .loader { border: 3px solid #f3f3f3; border-top: 3px solid var(--primary-color); border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 5px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
     <div id="login-screen">
-        <div class="card">
-            <h2>Local Chat</h2>
-            <p style="margin-bottom: 20px; opacity: 0.7; font-size: 0.9rem;">Работает между вкладками браузера</p>
-            
-            <input type="text" id="username-input" placeholder="Ваше имя" maxlength="15">
-            
-            <div style="margin: 20px 0; border-top: 1px solid var(--border-color); position: relative;">
-                <span style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--sidebar-bg); padding: 0 10px; font-size: 0.8rem; opacity: 0.7;">ИЛИ</span>
-            </div>
+        <div class="card" id="step-1">
+            <h2>Интернет Чат</h2>
+            <p style="opacity: 0.7; font-size: 0.9rem; margin-bottom: 15px;">P2P соединение (работает через интернет)</p>
+            <input type="text" id="my-name" placeholder="Ваше имя" maxlength="15">
+            <button onclick="initPeer()">Получить мой ID</button>
+        </div>
 
-            <button onclick="createRoom()">Создать новую комнату</button>
-            <input type="text" id="room-code-input" placeholder="Введите код комнаты">
-            <button class="secondary" onclick="joinRoom()">Войти в комнату</button>
+        <div class="card" id="step-2" style="display: none;">
+            <h3>Ваш ID:</h3>
+            <div style="background: var(--chat-bg); padding: 10px; border-radius: 5px; margin: 10px 0; font-family: monospace; font-weight: bold; border: 1px solid var(--primary-color); color: var(--primary-color); word-break: break-all;" id="my-id-display">...</div>
+            <p style="font-size: 0.8rem; margin-bottom: 15px;">Скопируйте этот ID и отправьте другу,<br>или вставьте ID друга ниже.</p>
             
-            <div style="margin-top: 20px;">
-                <button class="theme-toggle" onclick="toggleTheme()">🌓</button>
-            </div>
+            <div style="border-top: 1px solid var(--border-color); margin: 15px 0;"></div>
+            
+            <input type="text" id="friend-id" placeholder="Вставьте ID друга сюда">
+            <button onclick="connectToFriend()">Подключиться</button>
+            <div class="status" id="status-msg">Ожидание подключения...</div>
         </div>
     </div>
 
     <div id="chat-app">
         <header>
-            <div class="room-info">
-                Комната: <span id="display-room-code" class="room-code" onclick="copyCode()" title="Нажми чтобы скопировать">---</span>
-                <br><span style="font-size: 0.8em; opacity: 0.7;">Вы: <span id="display-username"></span></span>
-            </div>
             <div>
-                <button class="secondary" style="width: auto; padding: 5px 15px;" onclick="leaveRoom()">Выйти</button>
-                <button class="theme-toggle" onclick="toggleTheme()">🌓</button>
+                <span style="font-weight: bold;">Чат с собеседником</span><br>
+                <span style="font-size: 0.8rem; opacity: 0.7;" id="chat-status">Подключено</span>
             </div>
+            <button onclick="toggleTheme()" style="width: auto; padding: 5px 15px; background: transparent; color: var(--text-color); border: 1px solid var(--border-color);">🌓</button>
         </header>
 
         <div id="messages-area"></div>
 
         <footer>
-            <input type="text" id="message-input" placeholder="Введите сообщение..." onkeypress="handleEnter(event)">
-            <button style="width: auto; padding: 0 20px;" onclick="sendMessage()">➤</button>
+            <input type="text" id="msg-input" placeholder="Сообщение..." onkeypress="handleEnter(event)">
+            <button onclick="sendMessage()" style="width: auto; padding: 0 20px;">➤</button>
         </footer>
     </div>
 
     <script>
-        // --- Логика приложения ---
-        
-        let currentUser = '';
-        let currentRoom = '';
-        
-        // Ключ для хранения в LocalStorage
-        const STORAGE_PREFIX = 'local_chat_room_';
+        let peer;
+        let conn;
+        let myName = '';
 
-        // Инициализация темы
-        if (localStorage.getItem('theme') === 'dark') {
-            document.body.setAttribute('data-theme', 'dark');
+        // Настройка темы
+        if (localStorage.getItem('theme') === 'dark') document.body.setAttribute('data-theme', 'dark');
+        function toggleTheme() {
+            const body = document.body;
+            const newTheme = body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            body.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
         }
 
-        // 1. Создание комнаты
-        function createRoom() {
-            const user = document.getElementById('username-input').value.trim();
-            if (!user) return alert('Введите имя!');
+        // ШАГ 1: Инициализация
+        function initPeer() {
+            myName = document.getElementById('my-name').value.trim();
+            if (!myName) return alert("Введите имя!");
 
-            const roomId = Math.random().toString(36).substr(2, 6).toUpperCase();
-            enterChat(user, roomId);
-        }
+            document.getElementById('step-1').style.display = 'none';
+            document.getElementById('step-2').style.display = 'block';
+            document.getElementById('status-msg').innerHTML = '<div class="loader"></div> Генерация ID...';
 
-        // 2. Вход в существующую комнату
-        function joinRoom() {
-            const user = document.getElementById('username-input').value.trim();
-            const roomId = document.getElementById('room-code-input').value.trim().toUpperCase();
+            // Создаем объект Peer (используем публичный сервер peerjs)
+            peer = new Peer(null, {
+                debug: 2
+            });
 
-            if (!user) return alert('Введите имя!');
-            if (!roomId) return alert('Введите код комнаты!');
+            peer.on('open', (id) => {
+                document.getElementById('my-id-display').textContent = id;
+                document.getElementById('status-msg').textContent = 'Отправьте ваш ID другу или введите его ID.';
+                
+                // Автоматическое копирование при клике
+                document.getElementById('my-id-display').onclick = () => {
+                    navigator.clipboard.writeText(id);
+                    alert("ID скопирован!");
+                };
+            });
 
-            enterChat(user, roomId);
-        }
-
-        // Логика входа
-        function enterChat(user, roomId) {
-            currentUser = user;
-            currentRoom = roomId;
-
-            document.getElementById('login-screen').classList.add('hidden');
-            document.getElementById('chat-app').style.display = 'flex';
+            // Если кто-то подключается к нам
+            peer.on('connection', (c) => {
+                conn = c;
+                setupConnection();
+            });
             
-            document.getElementById('display-username').textContent = currentUser;
-            document.getElementById('display-room-code').textContent = currentRoom;
-
-            loadMessages();
-            scrollToBottom();
+            peer.on('error', (err) => {
+                alert("Ошибка: " + err.type);
+            });
         }
 
-        // 3. Выход
-        function leaveRoom() {
-            currentUser = '';
-            currentRoom = '';
-            document.getElementById('login-screen').classList.remove('hidden');
-            document.getElementById('chat-app').style.display = 'none';
+        // ШАГ 2: Подключение к другу
+        function connectToFriend() {
+            const friendId = document.getElementById('friend-id').value.trim();
+            if (!friendId) return alert("Введите ID друга!");
+            
+            document.getElementById('status-msg').innerHTML = '<div class="loader"></div> Подключение...';
+            
+            conn = peer.connect(friendId);
+            setupConnection();
         }
 
-        // 4. Отправка сообщения
+        // Настройка соединения (общая логика)
+        function setupConnection() {
+            conn.on('open', () => {
+                // Соединение установлено
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('chat-app').style.display = 'flex';
+                
+                // Отправляем наше имя сразу после подключения
+                conn.send({ type: 'system', text: myName + ' присоединился к чату' });
+            });
+
+            conn.on('data', (data) => {
+                renderMessage(data, false);
+            });
+
+            conn.on('close', () => {
+                alert("Собеседник покинул чат");
+                location.reload();
+            });
+        }
+
+        // Отправка сообщений
         function sendMessage() {
-            const input = document.getElementById('message-input');
+            const input = document.getElementById('msg-input');
             const text = input.value.trim();
-            if (!text) return;
+            if (!text || !conn) return;
 
-            const message = {
-                id: Date.now(),
-                user: currentUser,
-                text: text,
-                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
-            };
-
-            saveMessage(message);
+            const msgData = { type: 'message', user: myName, text: text };
+            
+            // Отображаем у себя
+            renderMessage(msgData, true);
+            // Отправляем другу
+            conn.send(msgData);
+            
             input.value = '';
-            loadMessages(); // Обновляем у себя
+        }
+
+        function renderMessage(data, isMine) {
+            const area = document.getElementById('messages-area');
+            const div = document.createElement('div');
+            
+            if (data.type === 'system') {
+                div.style.textAlign = 'center';
+                div.style.fontSize = '0.8rem';
+                div.style.opacity = '0.6';
+                div.style.margin = '10px 0';
+                div.innerText = data.text;
+            } else {
+                div.className = `message ${isMine ? 'sent' : 'received'}`;
+                div.innerHTML = `
+                    <div style="font-size:0.7rem; margin-bottom:2px; opacity:0.8">${isMine ? 'Вы' : escapeHtml(data.user)}</div>
+                    ${escapeHtml(data.text)}
+                `;
+            }
+            
+            area.appendChild(div);
+            area.scrollTop = area.scrollHeight;
         }
 
         function handleEnter(e) {
             if (e.key === 'Enter') sendMessage();
         }
 
-        // 5. Работа с LocalStorage
-        function saveMessage(msg) {
-            const key = STORAGE_PREFIX + currentRoom;
-            let history = JSON.parse(localStorage.getItem(key) || '[]');
-            history.push(msg);
-            localStorage.setItem(key, JSON.stringify(history));
-        }
-
-        function loadMessages() {
-            if (!currentRoom) return;
-
-            const key = STORAGE_PREFIX + currentRoom;
-            const history = JSON.parse(localStorage.getItem(key) || '[]');
-            const container = document.getElementById('messages-area');
-            
-            container.innerHTML = ''; // Очистка (не идеально для производительности, но просто для примера)
-
-            history.forEach(msg => {
-                const div = document.createElement('div');
-                const isMine = msg.user === currentUser;
-                
-                div.className = `message ${isMine ? 'sent' : 'received'}`;
-                div.innerHTML = `
-                    <span class="meta">${isMine ? 'Вы' : msg.user} • ${msg.time}</span>
-                    ${escapeHtml(msg.text)}
-                `;
-                container.appendChild(div);
-            });
-            
-            scrollToBottom();
-        }
-
-        // 6. Синхронизация между вкладками
-        // Это "магия", которая заставляет чат работать в реальном времени
-        window.addEventListener('storage', (e) => {
-            if (e.key === STORAGE_PREFIX + currentRoom) {
-                loadMessages();
-            }
-        });
-
-        // Утилиты
-        function scrollToBottom() {
-            const area = document.getElementById('messages-area');
-            area.scrollTop = area.scrollHeight;
-        }
-
-        function toggleTheme() {
-            const body = document.body;
-            if (body.getAttribute('data-theme') === 'dark') {
-                body.removeAttribute('data-theme');
-                localStorage.setItem('theme', 'light');
-            } else {
-                body.setAttribute('data-theme', 'dark');
-                localStorage.setItem('theme', 'dark');
-            }
-        }
-
-        function copyCode() {
-            navigator.clipboard.writeText(currentRoom).then(() => {
-                alert('Код комнаты скопирован: ' + currentRoom);
-            });
-        }
-
         function escapeHtml(text) {
-            return text
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
         }
     </script>
 </body>
