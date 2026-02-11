@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Современный Чат</title>
     <style>
+        /* CSS стили остаются почти такими же, как в предыдущем примере */
+        /* Добавил несколько новых цветов для системных сообщений */
         :root {
             --bg-color: #f0f2f5;
             --text-color: #333;
@@ -17,6 +19,8 @@
             --message-bg-other: #e9e9eb;
             --header-bg-color: #e9ecef;
             --shadow-color: rgba(0, 0, 0, 0.1);
+            --system-message-color: #888; /* Новый цвет для системных сообщений */
+            --system-message-bg: #f8f9fa; /* Новый фон для системных сообщений */
         }
 
         .dark-mode {
@@ -31,6 +35,8 @@
             --message-bg-other: #3a3a4e;
             --header-bg-color: #2e2e42;
             --shadow-color: rgba(0, 0, 0, 0.3);
+            --system-message-color: #b0b0b0;
+            --system-message-bg: #3a3a4e;
         }
 
         body {
@@ -230,6 +236,18 @@
         }
         .dark-mode .message.other {
             color: var(--text-color);
+        }
+
+        .message.system {
+            align-self: center;
+            background-color: var(--system-message-bg);
+            color: var(--system-message-color);
+            font-style: italic;
+            font-size: 0.9em;
+            padding: 5px 10px;
+            border-radius: 10px;
+            max-width: 90%;
+            text-align: center;
         }
 
         .message .sender {
@@ -456,11 +474,20 @@
         </div>
     </div>
 
+    <!-- Подключаем клиентскую библиотеку Socket.IO -->
+    <script src="/socket.io/socket.io.js"></script>
     <script>
-        const USER_KEY = 'chat_user_settings';
-        const ROOMS_KEY = 'chat_rooms';
-        let currentRoomId = null;
+        const USER_SETTINGS_KEY = 'chat_user_settings';
+        // Хранилище для комнат, в которые пользователь присоединялся
+        // (чтобы их можно было удобно переключать в sidebar)
+        const MY_JOINED_ROOMS_KEY = 'my_joined_chat_rooms'; 
+
+        let socket = null; // Переменная для Socket.IO соединения
+        let currentRoomCode = null; // Теперь храним код комнаты вместо ID
+        let currentRoomName = null;
         let userName = 'Аноним';
+        let myJoinedRooms = {}; // { roomCode: { name: "...", messages: [...] } } - локальное кэширование
+
 
         // --- Вспомогательные функции ---
         function generateUniqueCode(length = 6) {
@@ -497,7 +524,7 @@
 
         // --- Инициализация и настройки пользователя ---
         function initializeUserSettings() {
-            const userSettings = loadFromLocalStorage(USER_KEY, { name: 'Аноним', darkMode: false });
+            const userSettings = loadFromLocalStorage(USER_SETTINGS_KEY, { name: 'Аноним', darkMode: false });
             userName = userSettings.name;
             document.getElementById('userNameInput').value = userName;
 
@@ -508,93 +535,157 @@
                 document.body.classList.remove('dark-mode');
                 document.getElementById('darkModeToggle').checked = false;
             }
+            
+            myJoinedRooms = loadFromLocalStorage(MY_JOINED_ROOMS_KEY, {});
         }
 
         function updateUserName() {
             userName = document.getElementById('userNameInput').value.trim();
             if (!userName) userName = 'Аноним';
-            const userSettings = loadFromLocalStorage(USER_KEY, {});
+            const userSettings = loadFromLocalStorage(USER_SETTINGS_KEY, {});
             userSettings.name = userName;
-            saveToLocalStorage(USER_KEY, userSettings);
-            // Если активно в комнате, можно обновить сообщения или просто сохранить
-            loadRooms(); // Перезагружаем комнаты, чтобы имя обновилось, если оно отображается
+            saveToLocalStorage(USER_SETTINGS_KEY, userSettings);
         }
 
         function toggleDarkMode() {
             document.body.classList.toggle('dark-mode');
             const isDarkMode = document.body.classList.contains('dark-mode');
-            const userSettings = loadFromLocalStorage(USER_KEY, {});
+            const userSettings = loadFromLocalStorage(USER_SETTINGS_KEY, {});
             userSettings.darkMode = isDarkMode;
-            saveToLocalStorage(USER_KEY, userSettings);
+            saveToLocalStorage(USER_SETTINGS_KEY, userSettings);
         }
+        
+        // --- Управление Socket.IO ---
+        function connectSocket() {
+            if (socket && socket.connected) {
+                return; // Уже подключены
+            }
+            socket = io(); // Подключаемся к текущему хосту
 
-        // --- Управление комнатами ---
-        function loadRooms() {
-            const rooms = loadFromLocalStorage(ROOMS_KEY, {});
-            const roomListElement = document.getElementById('roomList');
-            roomListElement.innerHTML = ''; // Очищаем список
-
-            // Сортируем комнаты по последнему сообщению или по алфавиту
-            const sortedRooms = Object.values(rooms).sort((a, b) => {
-                const lastMessageA = a.messages.length > 0 ? a.messages[a.messages.length - 1].timestamp : 0;
-                const lastMessageB = b.messages.length > 0 ? b.messages[b.messages.length - 1].timestamp : 0;
-                return lastMessageB - lastMessageA; // Сначала новые
+            socket.on('connect', () => {
+                console.log('Подключено к серверу Socket.IO');
+                // Запросить список комнат при подключении
+                socket.emit('getRoomList');
             });
 
+            socket.on('roomCreated', (room) => {
+                console.log('Комната создана на сервере:', room);
+                myJoinedRooms[room.code] = room; // Добавляем в локальное хранилище
+                saveToLocalStorage(MY_JOINED_ROOMS_KEY, myJoinedRooms);
+                loadJoinedRoomsList();
+                selectRoom(room.code);
+            });
+
+            socket.on('roomJoined', (room) => {
+                console.log('Вы успешно присоединились к комнате:', room);
+                myJoinedRooms[room.code] = room; // Добавляем в локальное хранилище
+                saveToLocalStorage(MY_JOINED_ROOMS_KEY, myJoinedRooms);
+                loadJoinedRoomsList();
+                selectRoom(room.code);
+            });
+
+            socket.on('roomNotFound', (message) => {
+                alert(message);
+            });
+
+            socket.on('loadMessages', (messages) => {
+                // Сервер присылает историю сообщений при присоединении к комнате
+                if (currentRoomCode && myJoinedRooms[currentRoomCode]) {
+                    myJoinedRooms[currentRoomCode].messages = messages; // Обновляем локальную копию
+                    displayMessages(messages);
+                }
+            });
+
+            socket.on('receiveMessage', (message) => {
+                console.log('Получено сообщение:', message);
+                // Добавляем сообщение в локальное хранилище, если это текущая комната
+                if (currentRoomCode && myJoinedRooms[currentRoomCode]) {
+                    myJoinedRooms[currentRoomCode].messages.push(message);
+                    if (currentRoomCode === message.roomCode || !message.roomCode) { // Если не указан roomCode в сообщении, подразумеваем текущую
+                        displayMessages(myJoinedRooms[currentRoomCode].messages);
+                    }
+                    saveToLocalStorage(MY_JOINED_ROOMS_KEY, myJoinedRooms);
+                    loadJoinedRoomsList(); // Обновить список, чтобы комната с новым сообщением поднялась вверх
+                }
+            });
+
+            socket.on('updateRoomList', (serverRooms) => {
+                // Обновляем общий список комнат, доступных на сервере
+                // (можно использовать для отображения всех активных комнат или для автодополнения)
+                console.log('Обновлен список комнат на сервере:', serverRooms);
+                // Сейчас мы используем 'myJoinedRooms' для боковой панели,
+                // но 'serverRooms' можно использовать для других целей.
+            });
+
+            socket.on('userJoined', (message) => {
+                if (currentRoomCode) {
+                    displaySystemMessage(message);
+                }
+            });
+
+            socket.on('disconnect', () => {
+                console.log('Отключено от сервера Socket.IO');
+                // Можно добавить логику для переподключения
+            });
+        }
+
+        // --- Управление комнатами (клиентская часть) ---
+        function loadJoinedRoomsList() {
+            const roomListElement = document.getElementById('roomList');
+            roomListElement.innerHTML = '';
+
+            const sortedRooms = Object.values(myJoinedRooms).sort((a, b) => {
+                const lastMessageA = a.messages.length > 0 ? a.messages[a.messages.length - 1].timestamp : 0;
+                const lastMessageB = b.messages.length > 0 ? b.messages[b.messages.length - 1].timestamp : 0;
+                // Примечание: timestamp здесь - строка. Для сравнения нужно бы парсить или хранить Date.now()
+                // Пока просто по алфавиту
+                return a.name.localeCompare(b.name);
+            });
 
             sortedRooms.forEach(room => {
                 const listItem = document.createElement('li');
-                listItem.dataset.roomId = room.id;
+                listItem.dataset.roomCode = room.code;
                 listItem.classList.add('room-item');
-                if (room.id === currentRoomId) {
+                if (room.code === currentRoomCode) {
                     listItem.classList.add('active');
                 }
                 listItem.innerHTML = `
                     <span class="room-name">${room.name}</span>
                     <span class="room-code">${room.code}</span>
                 `;
-                listItem.onclick = () => selectRoom(room.id);
+                listItem.onclick = () => selectRoom(room.code);
                 roomListElement.appendChild(listItem);
             });
 
             // Если текущая комната была удалена или изменилась, сбросить выбор
-            if (currentRoomId && !rooms[currentRoomId]) {
-                currentRoomId = null;
+            if (currentRoomCode && !myJoinedRooms[currentRoomCode]) {
+                currentRoomCode = null;
                 document.getElementById('currentRoomName').textContent = 'Выберите или создайте комнату';
                 document.getElementById('messageInput').disabled = true;
                 document.querySelector('.chat-input button').disabled = true;
                 document.getElementById('copyCodeButton').style.display = 'none';
                 document.getElementById('chatMessages').innerHTML = '';
-            }
-             if (currentRoomId) {
-                selectRoom(currentRoomId); // Перевыбираем текущую комнату для обновления отображения
-            } else if (Object.keys(rooms).length > 0) {
-                 // Если нет выбранной комнаты, но есть комнаты, выбираем первую
-                 selectRoom(sortedRooms[0].id);
+            } else if (currentRoomCode) {
+                // Перевыбираем текущую комнату для обновления активного класса
+                selectRoom(currentRoomCode);
+            } else if (Object.keys(myJoinedRooms).length > 0) {
+                 // Если нет выбранной комнаты, но есть присоединенные, выбираем первую
+                 selectRoom(sortedRooms[0].code);
              }
         }
 
         function createRoom() {
             let roomCode = generateUniqueCode();
-            const rooms = loadFromLocalStorage(ROOMS_KEY, {});
-
-            // Убеждаемся, что код действительно уникален
-            while (Object.values(rooms).some(room => room.code === roomCode)) {
-                roomCode = generateUniqueCode();
-            }
-
-            const roomId = `room_${Date.now()}`;
+            // В реальном приложении здесь был бы запрос к серверу для проверки уникальности
+            // Для Socket.IO, сервер сам генерирует или проверяет
+            
             const roomName = `Комната ${roomCode}`;
-            const newRoom = {
-                id: roomId,
-                code: roomCode,
-                name: roomName,
-                messages: []
-            };
-            rooms[roomId] = newRoom;
-            saveToLocalStorage(ROOMS_KEY, rooms);
-            loadRooms();
-            selectRoom(roomId);
+            
+            if (socket) {
+                socket.emit('createRoom', { roomCode, roomName, userName });
+            } else {
+                alert('Нет подключения к серверу.');
+            }
         }
 
         function joinRoomByCode() {
@@ -605,42 +696,31 @@
                 return;
             }
 
-            const rooms = loadFromLocalStorage(ROOMS_KEY, {});
-            const existingRoom = Object.values(rooms).find(room => room.code === roomCode);
-
-            if (existingRoom) {
-                alert(`Вы уже состоите в комнате "${existingRoom.name}".`);
-                selectRoom(existingRoom.id);
+            if (myJoinedRooms[roomCode]) {
+                alert(`Вы уже состоите в комнате "${myJoinedRooms[roomCode].name}".`);
+                selectRoom(roomCode);
             } else {
-                // В реальном приложении здесь был бы запрос на сервер для присоединения.
-                // Для имитации, просто создаем "новую" комнату с этим кодом.
-                const roomId = `room_${Date.now()}`;
-                const newRoom = {
-                    id: roomId,
-                    code: roomCode,
-                    name: `Комната ${roomCode}`,
-                    messages: [] // Присоединившийся пользователь начинает с пустой историей для этой комнаты
-                };
-                rooms[roomId] = newRoom;
-                saveToLocalStorage(ROOMS_KEY, rooms);
-                alert(`Вы успешно присоединились к комнате с кодом: ${roomCode}`);
-                loadRooms();
-                selectRoom(roomId);
+                if (socket) {
+                    socket.emit('joinRoom', { roomCode, userName });
+                } else {
+                    alert('Нет подключения к серверу.');
+                }
             }
             codeInput.value = '';
         }
 
-        function selectRoom(roomId) {
-            currentRoomId = roomId;
-            const rooms = loadFromLocalStorage(ROOMS_KEY, {});
-            const room = rooms[roomId];
+        function selectRoom(roomCode) {
+            currentRoomCode = roomCode;
+            const room = myJoinedRooms[roomCode];
 
             if (!room) {
-                console.error("Комната не найдена:", roomId);
+                console.error("Комната не найдена в локальном кэше:", roomCode);
+                document.getElementById('currentRoomName').textContent = 'Ошибка: Комната не найдена';
                 return;
             }
-
-            document.getElementById('currentRoomName').textContent = room.name;
+            
+            currentRoomName = room.name;
+            document.getElementById('currentRoomName').textContent = currentRoomName;
             document.getElementById('messageInput').disabled = false;
             document.querySelector('.chat-input button').disabled = false;
             document.getElementById('copyCodeButton').style.display = 'inline-block';
@@ -649,25 +729,25 @@
             document.querySelectorAll('.room-list li').forEach(li => {
                 li.classList.remove('active');
             });
-            document.querySelector(`.room-list li[data-room-id="${roomId}"]`)?.classList.add('active');
+            document.querySelector(`.room-list li[data-room-code="${roomCode}"]`)?.classList.add('active');
 
             displayMessages(room.messages);
+            
+            // Если мы переключились на комнату, о которой у нас нет полной истории (но есть в myJoinedRooms),
+            // можно запросить историю у сервера. В текущей реализации `loadMessages` уже это делает
+            // при 'roomJoined'/'roomCreated'.
         }
 
         function copyRoomCode() {
-            if (!currentRoomId) return;
-            const rooms = loadFromLocalStorage(ROOMS_KEY, {});
-            const room = rooms[currentRoomId];
-            if (room && room.code) {
-                navigator.clipboard.writeText(room.code)
-                    .then(() => {
-                        alert(`Код комнаты "${room.code}" скопирован в буфер обмена!`);
-                    })
-                    .catch(err => {
-                        console.error('Не удалось скопировать текст: ', err);
-                        alert('Не удалось скопировать код комнаты.');
-                    });
-            }
+            if (!currentRoomCode) return;
+            navigator.clipboard.writeText(currentRoomCode)
+                .then(() => {
+                    alert(`Код комнаты "${currentRoomCode}" скопирован в буфер обмена!`);
+                })
+                .catch(err => {
+                    console.error('Не удалось скопировать текст: ', err);
+                    alert('Не удалось скопировать код комнаты.');
+                });
         }
 
 
@@ -690,35 +770,42 @@
             chatMessagesElement.scrollTop = chatMessagesElement.scrollHeight; // Прокрутка вниз
         }
 
+        function displaySystemMessage(text) {
+            const chatMessagesElement = document.getElementById('chatMessages');
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message', 'system');
+            messageElement.textContent = text;
+            chatMessagesElement.appendChild(messageElement);
+            chatMessagesElement.scrollTop = chatMessagesElement.scrollHeight;
+        }
+
         function sendMessage() {
-            if (!currentRoomId) return;
+            if (!currentRoomCode || !socket || !socket.connected) {
+                alert('Сначала выберите или создайте комнату и убедитесь, что вы подключены к серверу.');
+                return;
+            }
 
             const messageInput = document.getElementById('messageInput');
             const messageText = messageInput.value.trim();
 
             if (!messageText) return;
 
-            const rooms = loadFromLocalStorage(ROOMS_KEY, {});
-            const room = rooms[currentRoomId];
-
-            if (room) {
-                const newMessage = {
-                    sender: userName,
-                    text: messageText,
-                    timestamp: getFormattedTime()
-                };
-                room.messages.push(newMessage);
-                saveToLocalStorage(ROOMS_KEY, rooms); // Сохраняем все комнаты
-                displayMessages(room.messages); // Обновляем отображение только для текущей комнаты
-                messageInput.value = ''; // Очищаем поле ввода
-                loadRooms(); // Перезагружаем список комнат, чтобы обновить порядок
-            }
+            const newMessage = {
+                roomCode: currentRoomCode,
+                sender: userName,
+                text: messageText,
+                timestamp: getFormattedTime()
+            };
+            
+            socket.emit('sendMessage', newMessage); // Отправляем сообщение на сервер
+            messageInput.value = ''; // Очищаем поле ввода
         }
 
         // --- Обработчики событий ---
         document.addEventListener('DOMContentLoaded', () => {
             initializeUserSettings();
-            loadRooms();
+            connectSocket(); // Подключаемся к серверу при загрузке страницы
+            loadJoinedRoomsList(); // Загружаем список комнат, в которые пользователь уже присоединялся
 
             document.getElementById('userNameInput').addEventListener('change', updateUserName);
             document.getElementById('darkModeToggle').addEventListener('change', toggleDarkMode);
